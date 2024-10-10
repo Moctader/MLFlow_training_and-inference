@@ -8,46 +8,24 @@ from evidently.metrics import ColumnDriftMetric
 import mlflow
 
 class DataDriftDetector:
-    def __init__(self, ticker, start_date, end_date, reference_ratio=0.6, current_ratio=0.2):
-        self.ticker = ticker
-        self.start_date = start_date
-        self.end_date = end_date
-        self.reference_ratio = reference_ratio
-        self.current_ratio = current_ratio
-        self.data = None
-        self.reference_data = None
-        self.current_data_1 = None
-        self.current_data_2 = None
+    def __init__(self, reference_data, current_data_1, current_data_2):
+        self.reference_data = reference_data
+        self.current_data_1 = current_data_1
+        self.current_data_2 = current_data_2
 
     def consolidate(self, dataset, target_length):
         total_length = len(dataset)
         assert target_length <= total_length, 'THE TARGET LENGTH CAN ONLY BE SMALLER THAN THE DATASET'
-
-        # Create an array of indices for the original dataset
         original_indices = np.linspace(0, total_length - 1, num=total_length)
-        # Create an array of indices for the target length
         target_indices = np.linspace(0, total_length - 1, num=target_length)
-
-        # Interpolate the dataset to the target length
         consolidated_data = np.interp(target_indices, original_indices, dataset)
-
         return consolidated_data
 
-    def fetch_data(self):
-        df = yf.download(self.ticker, start=self.start_date, end=self.end_date)
-        self.data = df['Close']
-
-    def preprocess_data(self):
-        log_data = np.log(self.data)
+    def preprocess_data(self, data):
+        log_data = np.log(data)
         result = seasonal_decompose(log_data, model='additive', period=12).resid
-        result.dropna(inplace=True)
-        self.data = result
-
-    def split_data(self):
-        total_length = len(self.data)
-        self.reference_data = self.data[:int(total_length * self.reference_ratio)]
-        self.current_data_1 = self.data[int(total_length * self.reference_ratio):int(total_length * (self.reference_ratio + self.current_ratio))]
-        self.current_data_2 = self.data[int(total_length * (self.reference_ratio + self.current_ratio)):]
+        result = pd.Series(result).dropna()
+        return result
 
     def create_drift_report(self, reference_data, current_data, column_name='value', stattest='wasserstein', threshold=0.3):
         reference_df = pd.DataFrame(reference_data, columns=[column_name])
@@ -68,18 +46,16 @@ class DataDriftDetector:
         return drift_score, stattest_name, drift_detected
 
     def run(self, stattest_threshold_1=0.02, stattest_threshold_2=0.3):
-        # Fetch and preprocess data
-        self.fetch_data()
-        self.preprocess_data()
-
-        # Split data
-        self.split_data()
-
         # Consolidate data to the same length
         target_length = min(len(self.reference_data), len(self.current_data_1), len(self.current_data_2))
         self.reference_data = self.consolidate(self.reference_data, target_length)
         self.current_data_1 = self.consolidate(self.current_data_1, target_length)
         self.current_data_2 = self.consolidate(self.current_data_2, target_length)
+
+        # Preprocess data
+        self.reference_data = self.preprocess_data(self.reference_data)
+        self.current_data_1 = self.preprocess_data(self.current_data_1)
+        self.current_data_2 = self.preprocess_data(self.current_data_2)
 
         # Create drift reports
         drift_report_1 = self.create_drift_report(self.reference_data, self.current_data_1, threshold=stattest_threshold_1)
@@ -102,8 +78,22 @@ class DataDriftDetector:
             mlflow.log_param("drift_detected_1", drift_detected_1)
             mlflow.log_param("drift_detected_2", drift_detected_2)
 
-    
+     
+
+# Helper functions to fetch and split data
+def fetch_data(ticker, start_date, end_date):
+    df = yf.download(ticker, start=start_date, end=end_date)
+    return df['Close']
+
+def split_data(data, reference_ratio=0.6, current_ratio=0.2):
+    total_length = len(data)
+    reference_data = data[:int(total_length * reference_ratio)]
+    current_data_1 = data[int(total_length * reference_ratio):int(total_length * (reference_ratio + current_ratio))]
+    current_data_2 = data[int(total_length * (reference_ratio + current_ratio)):]
+    return reference_data, current_data_1, current_data_2
 
 if __name__ == "__main__":
-    detector = DataDriftDetector(ticker='AAPL', start_date='2010-01-01', end_date='2021-01-01')
+    data = fetch_data(ticker='AAPL', start_date='2010-01-01', end_date='2021-01-01')
+    reference_data, current_data_1, current_data_2 = split_data(data)
+    detector = DataDriftDetector(reference_data, current_data_1, current_data_2)
     detector.run()
