@@ -81,11 +81,30 @@ drift_report_2.save_html("drift_report_2.html")
 # Set the MLflow tracking URI to the local MLflow server
 mlflow.set_tracking_uri("http://127.0.0.1:5001")
 
-# Log the drift reports in MLflow
+# Extract drift scores, stattest names, and drift detected flags
+drift_report_1_dict = drift_report_1.as_dict()
+drift_report_2_dict = drift_report_2.as_dict()
+
+drift_score_1 = drift_report_1_dict['metrics'][0]['result']['drift_score']
+drift_score_2 = drift_report_2_dict['metrics'][0]['result']['drift_score']
+
+stattest_name_1 = drift_report_1_dict['metrics'][0]['result']['stattest_name']
+stattest_name_2 = drift_report_2_dict['metrics'][0]['result']['stattest_name']
+
+drift_detected_1 = drift_report_1_dict['metrics'][0]['result']['drift_detected']
+drift_detected_2 = drift_report_2_dict['metrics'][0]['result']['drift_detected']
+
+# Log the drift reports, drift scores, stattest names, and drift detected flags in MLflow
 with mlflow.start_run():
     mlflow.log_artifact("drift_report_1.html")
     mlflow.log_artifact("drift_report_2.html")
+    mlflow.log_metric("drift_score_1", drift_score_1)
+    mlflow.log_metric("drift_score_2", drift_score_2)
+    mlflow.log_param("stattest_name_1", stattest_name_1)
+    mlflow.log_param("stattest_name_2", stattest_name_2)
+    mlflow.log_param("drift_detected_1", drift_detected_1)
+    mlflow.log_param("drift_detected_2", drift_detected_2)
 
 # Display the drift reports
-drift_report_1.show()
-drift_report_2.show()
+print(drift_report_1_dict)
+print(drift_report_2_dict)
