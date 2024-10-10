@@ -11,6 +11,7 @@ from evidently.pipeline.column_mapping import ColumnMapping
 from evidently.report import Report
 from evidently.metric_preset import DataDriftPreset
 from evidently.metrics import ColumnDriftMetric
+import mlflow
 
 def consolidate(dataset, target_length):
     total_length = len(dataset)
@@ -76,6 +77,14 @@ drift_report_2.run(reference_data=reference_df, current_data=current_df_2, colum
 # Save the drift reports as HTML files
 drift_report_1.save_html("drift_report_1.html")
 drift_report_2.save_html("drift_report_2.html")
+
+# Set the MLflow tracking URI to the local MLflow server
+mlflow.set_tracking_uri("http://127.0.0.1:5001")
+
+# Log the drift reports in MLflow
+with mlflow.start_run():
+    mlflow.log_artifact("drift_report_1.html")
+    mlflow.log_artifact("drift_report_2.html")
 
 # Display the drift reports
 drift_report_1.show()

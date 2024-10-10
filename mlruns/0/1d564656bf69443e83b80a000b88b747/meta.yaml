@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/0/1d564656bf69443e83b80a000b88b747/artifacts
+end_time: 1728535150325
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 1d564656bf69443e83b80a000b88b747
+run_name: languid-jay-562
+run_uuid: 1d564656bf69443e83b80a000b88b747
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1728535150318
+status: 4
+tags: []
+user_id: moctader
