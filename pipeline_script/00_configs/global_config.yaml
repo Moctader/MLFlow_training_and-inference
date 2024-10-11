@@ -1,0 +1,64 @@
+endpoints:
+    host: 193.166.180.240
+    ports:
+        backend_api: 3003
+        kafka: 11001
+        cassandra: 12001
+        redis: 6379
+        mlflow: 5000
+
+        # NOTE: THIS IS UDP
+        jaeger: 6831
+
+###############################################################################################################
+###############################################################################################################
+
+# BACKEND API SETTINGS
+backend:
+
+    # HIDE/SHOW LOG STATEMENTS
+    verbose_logging: true
+
+    # HIDE AUXILLARY TABLES AND TOPICS FROM BACKEND LISTINGS?
+    # MAKES IT EASIER TO READ/FIND RELEVANT DATA
+    hide_auxillary: true
+
+###############################################################################################################
+###############################################################################################################
+
+# PYTHON PIPELINE SETTINGS
+pipeline:
+
+    # HIDE/SHOW LOG STATEMENTS
+    verbose_logging: true
+
+    # FOR HOW LONG SHOULD POLLING CLIENTS TIMEOUT?
+    # PREVENTS BUSY-WAITING
+    polling_cooldown: 0.3
+
+    # WHAT DATASETS SHOULD WE INGEST?
+    # HISTORICAL IS MASS INGESTED, STREAMING IS SLOWLY INGESTED
+    data_ingestion:
+        datasets:
+            historical: datasets/finance_historical.csv
+            streaming: datasets/finance_fresh.csv
+        
+        # BY HOW MUCH SHOULD WE STAGGER STREAM INGESTION?
+        streaming_delay: 1
+
+    # KAFKA CONSUMER SETTINGS
+    kafka:
+
+        # WHEN A CONSUMER IS BOOTED UP..
+        # WHAT INDEX SHOULD IT START READING FROM?
+        consumer_stategy: latest
+
+        # SHOULD CONSUMERS AUTO COMMIT OR NOT?
+        consumer_auto_commit: false
+        async_consumer_commit: true
+
+        # HOW SHOULD PRODUCERS ACKNOWLEDGE?
+        async_producer_ack: true
+
+    ###############################################################################################################
+    ###############################################################################################################

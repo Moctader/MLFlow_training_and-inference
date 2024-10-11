@@ -6,6 +6,8 @@ from evidently.pipeline.column_mapping import ColumnMapping
 from evidently.report import Report
 from evidently.metrics import ColumnDriftMetric
 import mlflow
+from sklearn.preprocessing import StandardScaler
+
 
 class DataDriftDetector:
     def __init__(self, reference_data, current_data_1, current_data_2):
@@ -25,9 +27,19 @@ class DataDriftDetector:
         log_data = np.log(data)
         result = seasonal_decompose(log_data, model='additive', period=12).resid
         result = pd.Series(result).dropna()
-        return result
-    # ks(p-value), wasserstein(distance), kl_div(divergence), psi(), jensenshannon(distance)
-    def create_drift_report(self, reference_data, current_data, column_name='value', stattest='wasserstein', threshold=0.04):
+        # Scaling the data
+        scaler = StandardScaler()
+        scaled_result = scaler.fit_transform(result.values.reshape(-1, 1))
+        return pd.Series(scaled_result.flatten())
+    
+    # ks(p-value, so sensitive ideal for less than 1000 values), 
+    # wasserstein(distance, ideal for more than 1000 values)
+    # kl_div("degree of drift," but cannot compare the "drift sizes" between each other )
+    # psi(react only to "major changes.")
+    # jensenshannon(good measure to detect significant changes)
+
+
+    def create_drift_report(self, reference_data, current_data, column_name='value', stattest='wasserstein', threshold=0.1):
         reference_df = pd.DataFrame(reference_data, columns=[column_name])
         current_df = pd.DataFrame(current_data, columns=[column_name])
         column_mapping = ColumnMapping()

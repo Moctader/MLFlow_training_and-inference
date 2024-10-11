@@ -1,0 +1,61 @@
+# AMAZON STOCK
+AMZN:
+    - layer:
+        pipe_1:
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_1
+                    version: champion
+
+# META STOCK
+META:
+    - layer:
+        pipe_2:
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_2
+                    version: champion
+                -   model: model_3
+                    version: champion
+                -   model: model_4
+                    version: champion
+        pipe_3:
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_5
+                    version: champion
+    - layer:
+        pipe_4:
+            # SPECIFY WHAT LAYER_1 INPUTS YOU REQUIRE?
+            # INCLUDE RAW INPUT?
+            layer_input: 
+                - pipe_2
+                - pipe_3
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_6
+                    version: champion
+                -   model: model_7
+                    version: champion
+
+# APPLE STOCK
+AAPL:
+    - layer:
+        pipe_5:
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_8
+                    version: champion
+                -   model: model_9
+                    version: champion
+        pipe_6:
+            description: TODO
+            prediction_column: TODO
+            model_sequence:
+                -   model: model_10
+                    version: champion
