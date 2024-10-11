@@ -58,9 +58,9 @@ class DataDriftDetector:
         return drift_score, stattest_name, drift_detected
 
 
-    def run(self, stattest_threshold_1=0.02, stattest_threshold_2=0.8):
+    def run(self, stattest_threshold=0.1):
         # Consolidate data to the same length
-        target_length = min(len(self.reference_data), len(self.current_data_1), len(self.current_data_2))
+        target_length = min(len(self.current_data_1), len(self.current_data_2))
         self.reference_data = self.consolidate(self.reference_data, target_length)
         self.current_data_1 = self.consolidate(self.current_data_1, target_length)
         self.current_data_2 = self.consolidate(self.current_data_2, target_length)
@@ -71,8 +71,8 @@ class DataDriftDetector:
         self.current_data_2 = self.preprocess_data(self.current_data_2)
 
         # Create drift reports
-        drift_report_1 = self.create_drift_report(self.reference_data, self.current_data_1, threshold=stattest_threshold_1)
-        drift_report_2 = self.create_drift_report(self.reference_data, self.current_data_2, threshold=stattest_threshold_2)
+        drift_report_1 = self.create_drift_report(self.reference_data, self.current_data_1, threshold=stattest_threshold)
+        drift_report_2 = self.create_drift_report(self.reference_data, self.current_data_2, threshold=stattest_threshold)
 
         # Set the MLflow tracking URI to the local MLflow server
         mlflow.set_tracking_uri("http://127.0.0.1:5001")
@@ -94,15 +94,16 @@ class DataDriftDetector:
      
 
 # Helper functions to fetch and split data
-def fetch_data(ticker, start_date, end_date):
-    df = yf.download(ticker, start=start_date, end=end_date)
-    return df['Close']
 
 def split_data(data, reference_ratio=0.02, current_ratio=0.01):
     total_length = len(data)
-    reference_data = data[:int(total_length * reference_ratio)]
-    current_data_1 = data[int(total_length * reference_ratio):int(total_length * (reference_ratio + current_ratio))]
-    current_data_2 = data[int(total_length * (reference_ratio + current_ratio)):]
+    reference_length = int(total_length * reference_ratio)
+    current_length = int(total_length * current_ratio)
+    
+    reference_data = data[:reference_length]
+    current_data_1 = data[reference_length:reference_length + current_length]
+    current_data_2 = data[reference_length + current_length:reference_length + 2 * current_length]
+    
     return reference_data, current_data_1, current_data_2
 
 if __name__ == "__main__":
