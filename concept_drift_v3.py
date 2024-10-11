@@ -11,20 +11,11 @@ from evidently.pipeline.column_mapping import ColumnMapping
 
 class DataProcessor:
     def preprocess_data(self, data):
-        # Remove non-positive values
         data = data[data > 0]
-        
-        # Apply logarithm
         log_data = np.log(data)
-        
-        # Handle missing values
         log_data = log_data.dropna()
-        
-        # Decompose the time series
         result = seasonal_decompose(log_data, model='additive', period=12).resid
         result = pd.Series(result).dropna()
-        
-        # Scaling the data
         scaler = StandardScaler()
         scaled_result = scaler.fit_transform(result.values.reshape(-1, 1))
         
@@ -162,6 +153,7 @@ class ModelQualityMetrics:
 
         return accuracy_ref, accuracy_current_1, accuracy_current_2
 
+
 def split_data(data, reference_ratio=0.02, current_ratio=0.01):
     total_length = len(data)
     reference_length = int(total_length * reference_ratio)
@@ -173,15 +165,15 @@ def split_data(data, reference_ratio=0.02, current_ratio=0.01):
     
     return reference_data, current_data_1, current_data_2
 
+
 if __name__ == "__main__":
     data = pd.read_csv('EODHD_EURUSD_HISTORICAL_2019_2024_1min.csv')
-    data['target'] = (data['close'].shift(-1) > data['close']).astype(int)  # Target: if next close > current close
+    data['target'] = (data['close'].shift(-1) > data['close']).astype(int)  
     data = data.dropna()
 
     reference_data, current_data_1, current_data_2 = split_data(data['close'])
     reference_target, current_target_1, current_target_2 = split_data(data['target'])
 
-    print(len(reference_data), len(reference_target), len(current_data_1), len(current_target_1), len(current_data_2), len(current_target_2))
 
     # Preprocess the data
     processor = DataProcessor()
