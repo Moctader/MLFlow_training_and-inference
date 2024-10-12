@@ -11,15 +11,19 @@ from evidently.pipeline.column_mapping import ColumnMapping
 
 class DataProcessor:
     def preprocess_data(self, data):
-        data = data[data > 0]
-        log_data = np.log(data)
-        log_data = log_data.dropna()
-        result = seasonal_decompose(log_data, model='additive', period=12).resid
-        result = pd.Series(result).dropna()
+        data = np.log(data / data.shift(1))
+        data = data.dropna()
         scaler = StandardScaler()
-        scaled_result = scaler.fit_transform(result.values.reshape(-1, 1))
-        
+        scaled_result = scaler.fit_transform(data.values.reshape(-1, 1))
         return pd.Series(scaled_result.flatten())
+
+    def consolidate(self, dataset, target_length):
+        total_length = len(dataset)
+        assert target_length <= total_length, 'THE TARGET LENGTH CAN ONLY BE SMALLER THAN THE DATASET'
+        original_indices = np.linspace(0, total_length - 1, num=total_length)
+        target_indices = np.linspace(0, total_length - 1, num=target_length)
+        consolidated_data = np.interp(target_indices, original_indices, dataset)
+        return consolidated_data
 
 class InputDataDrift:
     def __init__(self, reference_data, current_data_1, current_data_2):
@@ -64,9 +68,9 @@ class PredictionDataDrift:
 
     def run(self):
         # Predict on reference and current data
-        prediction_reference = self.model.predict(self.reference_data.values.reshape(-1, 1))
-        prediction_current_1 = self.model.predict(self.current_data_1.values.reshape(-1, 1))
-        prediction_current_2 = self.model.predict(self.current_data_2.values.reshape(-1, 1))
+        prediction_reference = self.model.predict(self.reference_data.reshape(-1, 1))
+        prediction_current_1 = self.model.predict(self.current_data_1.reshape(-1, 1))
+        prediction_current_2 = self.model.predict(self.current_data_2.reshape(-1, 1))
 
         # Ensure data is numerical
         reference_df = pd.DataFrame({'target': self.reference_target, 'prediction': prediction_reference.astype(float)})
@@ -103,9 +107,9 @@ class ChangeCorrelationInputVsPrediction:
 
     def run(self):
         # Predict on reference and current data
-        prediction_reference = self.model.predict(self.reference_data.values.reshape(-1, 1))
-        prediction_current_1 = self.model.predict(self.current_data_1.values.reshape(-1, 1))
-        prediction_current_2 = self.model.predict(self.current_data_2.values.reshape(-1, 1))
+        prediction_reference = self.model.predict(self.reference_data.reshape(-1, 1))
+        prediction_current_1 = self.model.predict(self.current_data_1.reshape(-1, 1))
+        prediction_current_2 = self.model.predict(self.current_data_2.reshape(-1, 1))
 
         # Ensure data is numerical
         reference_df = pd.DataFrame({'input': self.reference_data.astype(float), 'prediction': prediction_reference.astype(float)})
@@ -147,9 +151,9 @@ class ModelQualityMetrics:
         self.model = model
 
     def log_metrics(self):
-        accuracy_ref = accuracy_score(self.reference_target, self.model.predict(self.reference_data.values.reshape(-1, 1)))
-        accuracy_current_1 = accuracy_score(self.current_target_1, self.model.predict(self.current_data_1.values.reshape(-1, 1)))
-        accuracy_current_2 = accuracy_score(self.current_target_2, self.model.predict(self.current_data_2.values.reshape(-1, 1)))
+        accuracy_ref = accuracy_score(self.reference_target, self.model.predict(self.reference_data.reshape(-1, 1)))
+        accuracy_current_1 = accuracy_score(self.current_target_1, self.model.predict(self.current_data_1.reshape(-1, 1)))
+        accuracy_current_2 = accuracy_score(self.current_target_2, self.model.predict(self.current_data_2.reshape(-1, 1)))
 
         return accuracy_ref, accuracy_current_1, accuracy_current_2
 
@@ -171,20 +175,26 @@ if __name__ == "__main__":
     data['target'] = (data['close'].shift(-1) > data['close']).astype(int)  
     data = data.dropna()
 
+    processor = DataProcessor()
+    
+    # Preprocess the data before splitting
+    data['close'] = processor.preprocess_data(data['close'])
+
     reference_data, current_data_1, current_data_2 = split_data(data['close'])
     reference_target, current_target_1, current_target_2 = split_data(data['target'])
+    
 
+    # Consolidate the data to a target length for comparison
+    target_length = min(len(reference_data), len(reference_target), len(current_data_1), len(current_data_2), len(current_target_1), len(current_target_2))
+    reference_data = processor.consolidate(reference_data, target_length)
+    current_data_1 = processor.consolidate(current_data_1, target_length)
+    current_data_2 = processor.consolidate(current_data_2, target_length)
+    
+    # Consolidate the target data and round to nearest integer
+    reference_target = np.round(processor.consolidate(reference_target, target_length)).astype(int)
+    current_target_1 = np.round(processor.consolidate(current_target_1, target_length)).astype(int)
+    current_target_2 = np.round(processor.consolidate(current_target_2, target_length)).astype(int)
 
-    # Preprocess the data
-    processor = DataProcessor()
-    reference_data = processor.preprocess_data(reference_data)
-    current_data_1 = processor.preprocess_data(current_data_1)
-    current_data_2 = processor.preprocess_data(current_data_2)
-
-    # Ensure the targets have the same length as the preprocessed data
-    reference_target = reference_target[:len(reference_data)]
-    current_target_1 = current_target_1[:len(current_data_1)]
-    current_target_2 = current_target_2[:len(current_data_2)]
 
     model = LogisticRegression()
 
@@ -194,7 +204,7 @@ if __name__ == "__main__":
     # Log everything in a single MLflow run
     with mlflow.start_run():
         # Train the model
-        model.fit(reference_data.values.reshape(-1, 1), reference_target)
+        model.fit(reference_data.reshape(-1, 1), reference_target)
 
         # Input Drift Detection
         input_drift_detector = InputDataDrift(reference_data, current_data_1, current_data_2)
@@ -225,6 +235,7 @@ if __name__ == "__main__":
         # Model Quality Metrics
         model_quality = ModelQualityMetrics(reference_data, reference_target, current_data_1, current_target_1, current_data_2, current_target_2, model)
         accuracy_ref, accuracy_current_1, accuracy_current_2 = model_quality.log_metrics()
+        
         mlflow.log_metric("accuracy_reference", accuracy_ref)
         mlflow.log_metric("accuracy_current_1", accuracy_current_1)
         mlflow.log_metric("accuracy_current_2", accuracy_current_2)
